@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package gRPC.proto.bidirectional;
+
+service GRPCService {
+
+   rpc unary(Message) returns (Message) {}
+
+   rpc bidirectional(stream Message) returns (stream Message) {}
+
+   rpc response_stream(Message) returns (stream Message) {}
+
+   rpc request_stream(stream Message) returns (Message) {}
+}
+
+message Message {
+  string message = 1;
+}
