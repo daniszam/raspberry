@@ -8,11 +8,9 @@ broker = "localhost"
 # port
 port = 1883
 
-
 def on_publish(client, userdata, result):
     print("Device 1 : Data published.")
     pass
-
 
 client = paho.Client("admin")
 client.on_publish = on_publish
