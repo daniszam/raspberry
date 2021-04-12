@@ -2,7 +2,6 @@
 import paho.mqtt.client as paho
 import time
 import random
-
 # hostname
 broker = "localhost"
 # port

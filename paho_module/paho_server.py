@@ -1,4 +1,7 @@
 import paho.mqtt.client as mqtt
+
+import paho_module.telegram.telegram_bot as bot
+
 # This is the Subscriber
 # hostname
 broker = "localhost"
@@ -15,6 +18,7 @@ def on_connect(client, userdata, flags, rc):
 
 def on_message(client, userdata, msg):
     print(msg.payload.decode())
+    bot.need_to_notificate(msg.payload.decode())
 
 
 client = mqtt.Client()
