@@ -1,11 +1,21 @@
-import threading
-from datetime import datetime, timedelta
-from time import sleep
 import os
+from datetime import datetime, timedelta
+from multiprocessing import Process
+from time import sleep
 
+import paho.mqtt.client as mqtt
 import telebot
 
 raspberry_subscriber = {}
+# This is the Subscriber
+# hostname
+broker = "localhost"
+# port
+port = 1883
+# time to live
+timelive = 60
+
+unresolved_not = {}
 
 
 def init():
@@ -13,9 +23,9 @@ def init():
     for i in range(1, 10):
         raspberry_subscriber[str(i)] = list()
         try:
-            f = (open('telegram/notifications_' + str(i) + '.txt'))
+            f = (open('notifications_' + str(i) + '.txt'))
             for line in f:
-                raspberry_subscriber.get(str(i)).append(line.replace('\n',''))
+                raspberry_subscriber.get(str(i)).append(line.replace('\n', ''))
             f.close()
         except Exception as e:
             pass
@@ -34,43 +44,78 @@ def get_latest_update_id(bot):
 def save_notification(pi_number):
     print("Save subscribers list")
     try:
-        f = open('telegram/notifications_' + str(pi_number) + '.txt', 'w').close()
+        f = open('notifications_' + str(pi_number) + '.txt', 'w').close()
     except Exception as e:
         pass
-    f = open('telegram/notifications_' + str(pi_number) + '.txt', 'tw')
+    f = open('notifications_' + str(pi_number) + '.txt', 'tw')
     for chat in raspberry_subscriber[pi_number]:
         f.write(str(chat) + '\n')
     f.close()
 
 
 def need_to_notificate(msg):
-    f = open('telegram/need_to_notificate.txt', 'tw')
+    f = open('need_to_notificate.txt', 'tw')
     f.write(msg)
     f.close()
 
 
 def check_to_notice():
     try:
-        f = open('telegram/need_to_notificate.txt')
-        if not os.stat('telegram/need_to_notificate.txt').st_size == 0:
+        f = open('need_to_notificate.txt')
+        if not os.stat('need_to_notificate.txt').st_size == 0:
             print("Send notifications")
             for line in f:
                 pi_number = line.split(' ')[1]
-                send_notifications(pi_number, line)
-        os.remove('telegram/need_to_notificate.txt')
+                val = line.split(' ')[0]
+                send_notifications(pi_number, val)
+        os.remove('need_to_notificate.txt')
         f.close()
     except FileNotFoundError:
         print("Nothing to notificate")
 
 
 def send_notifications(pi_number, msg):
-    f = (open('telegram/notifications_' + str(pi_number) + '.txt'))
+    f = open('notifications_' + str(pi_number) + '.txt')
     for chat_id in f:
-        bot.send_message(chat_id, "Moved Notification: " + msg)
+        unresolved_not[pi_number] = msg
+        bot.send_message(chat_id,
+                         "🔥Alert for pi: " + str(pi_number) + " 🔥\nYour thing was moved. And new value is " + msg +
+                         ". Please text me OK if everything is okey 😎")
     f.close()
 
 
+def resolve_not(pi_number):
+    print("resolve pi" + str(pi_num))
+    f = open('notifications_' + str(pi_number) + '.txt')
+    if str(pi_number) in unresolved_not:
+        print("resolve")
+        for chat_id in f:
+            print(str(chat_id))
+            bot.send_message(chat_id, "👌Alert resolved for pi:" + str(
+                pi_number) + " 👌\nGood day, mate! I'm keeping an eye on your stuf.")
+        del unresolved_not[pi_number]
+
+
+def start_server():
+    def on_connect(client, userdata, flags, rc):
+        print("Connected with result code " + str(rc))
+        client.subscribe("/data")
+
+    def on_message(client, userdata, msg):
+        print(msg.payload.decode())
+        need_to_notificate(msg.payload.decode())
+
+    client = mqtt.Client()
+    client.connect(broker, port, timelive)
+    client.on_connect = on_connect
+    client.on_message = on_message
+    client.loop_forever()
+
+
 if __name__ == '__main__':
+
+    p = Process(target=start_server)
+    p.start()
     bot = telebot.TeleBot(import_name='distance_bot')
     bot.config['api_key'] = '1735365027:AAGYLp4qYUj0y45zIG14ik0CaS6zrAfTa80'
     # Start listening to the telegram bot and whenever a message is  received, the handle function will be called.
@@ -95,7 +140,6 @@ if __name__ == '__main__':
             last_message = last_update['message']
             chat_id = last_message['chat']['id']
             message_text = last_message['text']
-            #todo
             raspberry_number = '1'
 
             if '/subscribe' in message_text or '/unsubscribe' in message_text:
@@ -114,8 +158,8 @@ if __name__ == '__main__':
                     diff = planned_date - datetime.now()
                     diff_sec = diff.total_seconds()
                     bot.send_message(chat_id=chat_id,
-                                     text='You got subscription on this bot, if you want to unsubscribe, please, then just '
-                                          'type /unsubscribe command')
+                                     text='You got subscription on this bot, if you want to unsubscribe, '
+                                          'please, then just type /unsubscribe command')
                     save_notification(raspberry_number)
                 else:
                     bot.send_message(chat_id=chat_id,
@@ -128,6 +172,9 @@ if __name__ == '__main__':
                     raspberry_subscriber[raspberry_number].remove(chat_id)
                     bot.send_message(chat_id=chat_id, text='Okay :(')
                     save_notification(raspberry_number)
+            elif '/ok' in message_text and ' ' in message_text:
+                pi_num = message_text.split(' ')[1]
+                resolve_not(int(pi_num))
             update_id = last_update['update_id']
             sleep(1)
         except Exception as e:

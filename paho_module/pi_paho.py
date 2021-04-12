@@ -13,6 +13,7 @@ apds = APDS9960(bus)
 broker = "192.168.2.1"
 # port
 port = 1883
+uuid = 1
 
 
 def on_publish(client, userdata, result):
@@ -40,16 +41,17 @@ try:
     print("Proximity Sensor Test")
     print("=====================")
     apds.enableProximitySensor()
-    oval = -1
+    oval = None
     while True:
         sleep(0.25)
         val = apds.readProximity()
+        if oval is None:
+            oval = val
+
         if val != oval:
             print("proximity={}".format(val))
             oval = val
-
-            if val > 200:
-                ret = client.publish("/data", "Nearby val=" + val)
+            ret = client.publish("/data", "Value-changed:" + val + " " + uuid)
 
 finally:
     GPIO.cleanup()
