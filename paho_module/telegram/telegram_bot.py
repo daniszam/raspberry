@@ -1,5 +1,4 @@
 import os
-from datetime import datetime, timedelta
 from multiprocessing import Process
 from time import sleep
 
@@ -50,6 +49,19 @@ def save_notification(pi_number):
     f = open('notifications_' + str(pi_number) + '.txt', 'tw')
     for chat in raspberry_subscriber[pi_number]:
         f.write(str(chat) + '\n')
+    f.close()
+
+
+def delete_notification(pi_number, chat_id):
+    print("Delete notification")
+    try:
+        f = open('notifications_' + str(pi_number) + '.txt', 'w').close()
+    except Exception as e:
+        pass
+    f = open('notifications_' + str(pi_number) + '.txt', 'tw')
+    for chat in raspberry_subscriber[pi_number]:
+        if chat_id == chat:
+            f.write(chat.replace(chat_id, '') + '\n')
     f.close()
 
 
@@ -152,11 +164,6 @@ if __name__ == '__main__':
             elif '/subscribe' in message_text:
                 if chat_id not in raspberry_subscriber[raspberry_number]:
                     raspberry_subscriber.get(raspberry_number).append(chat_id)
-                    planned_time = datetime.strptime('10:10', "%H:%M")
-                    planned_date = datetime.now().replace(hour=planned_time.hour, minute=planned_time.minute,
-                                                          second=0) + timedelta(seconds=1)
-                    diff = planned_date - datetime.now()
-                    diff_sec = diff.total_seconds()
                     bot.send_message(chat_id=chat_id,
                                      text='You got subscription on this bot, if you want to unsubscribe, '
                                           'please, then just type /unsubscribe command')
@@ -171,7 +178,7 @@ if __name__ == '__main__':
                 else:
                     raspberry_subscriber[raspberry_number].remove(chat_id)
                     bot.send_message(chat_id=chat_id, text='Okay :(')
-                    save_notification(raspberry_number)
+                    delete_notification(raspberry_number, chat_id)
             elif '/ok' in message_text and ' ' in message_text:
                 pi_num = message_text.split(' ')[1]
                 resolve_not(int(pi_num))
